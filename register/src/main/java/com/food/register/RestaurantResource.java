@@ -2,9 +2,12 @@ package com.food.register;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.inject.Inject;
 import javax.transaction.Transactional;
+import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -18,10 +21,19 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import com.food.register.dto.CreateRestaurantDTO;
+import com.food.register.dto.RequestCreateRestaurantDTO;
+import com.food.register.dto.RequestCreateRestaurantMealDTO;
+import com.food.register.dto.RequestUpdateRestaurantDTO;
+import com.food.register.dto.ResponseRestaurantDTO;
 import com.food.register.mapper.RestaurantMapper;
+import com.food.register.mapper.RestaurantMealMapper;
+import com.food.register.validation.ConstraintViolationResponse;
 
 @Path("/restaurants")
 @Produces(MediaType.APPLICATION_JSON)
@@ -32,107 +44,114 @@ public class RestaurantResource {
     @Inject
     RestaurantMapper restaurantMapper;
 
+    @Inject
+    RestaurantMealMapper restaurantMealMapper;
+    
     @GET
-	public List<Restaurant> listAllRestaurants() {
-		return Restaurant.listAll();
-	}
+    public List<ResponseRestaurantDTO> listAllRestaurants() {
+        Stream<Restaurant> streamRestaurants = Restaurant.streamAll();
+        return streamRestaurants.map(restaurant -> restaurantMapper.map(restaurant)).collect(Collectors.toList());
+    }
 
-	@POST
-	@Transactional
-	public Response createRestaurant(CreateRestaurantDTO restaurantDTO) {
-	    Restaurant restaurant = restaurantMapper.map(restaurantDTO);
-		restaurant.persist();
-		return Response.status(Status.CREATED).build();
-	}
+    @POST
+    @Transactional
+    @APIResponses(value = {
+            @APIResponse(responseCode = "400", content = @Content(schema = @Schema(allOf = ConstraintViolationResponse.class))),
+            @APIResponse(responseCode = "201", description = "Restaurante salvo com sucesso") })
+    public Response createRestaurant(@Valid RequestCreateRestaurantDTO requestDTO) {
+        Restaurant restaurant = restaurantMapper.map(requestDTO);
+        restaurant.persist();
+        return Response.status(Status.CREATED).build();
+    }
 
-	@PUT
-	@Path("{id}")
-	@Transactional
-	public void updateRestaurant(@PathParam("id") Long id, Restaurant dto) {
-		Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
-		if (optRestaurant.isEmpty()) {
-			throw new NotFoundException();
-		}
+    @PUT
+    @Path("{id}")
+    @Transactional
+    public Response updateRestaurant(@PathParam("id") Long id, RequestUpdateRestaurantDTO requestDTO) {
+        Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
+        if (optRestaurant.isEmpty()) {
+            throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
+        }
 
-		Restaurant restaurant = optRestaurant.get();
-		restaurant.name = dto.name;
-		restaurant.persist();
-	}
+        Restaurant restaurant = optRestaurant.get();
 
-	@DELETE
-	@Path("{id}")
-	@Transactional
-	public void deleteRestaurant(@PathParam("id") Long id) {
-		Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
-		optRestaurant.ifPresentOrElse(Restaurant::delete, () -> {
-			throw new NotFoundException();
-		});
-	}
-	
-	@GET
-	@Path("{id}/dishes")
-	@Tag(name = "Dish")
-	public List<Restaurant> listAllRestaurantDishes(@PathParam("id") Long id) {
-		Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
-		if (optRestaurant.isEmpty()) {
-			throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
-		}
-		return DishMenu.list("restaurant", optRestaurant.get());
-	}
+        restaurantMapper.map(requestDTO, restaurant);
+        restaurant.persist();
+        return Response.status(Status.OK).build();
+    }
 
-	@POST
-	@Path("{id}/dishes")
-	@Tag(name = "Dish")
-	@Transactional
-	public Response createRestaurantDish(@PathParam("id") Long id, DishMenu dishDTO) {
-		Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
-		if (optRestaurant.isEmpty()) {
-			throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
-		}
-		
-		DishMenu dish = new DishMenu();
-		dish.name = dishDTO.name;
-		dish.description = dishDTO.description;
-		dish.price = dishDTO.price;
-		dish.restaurant = optRestaurant.get();
-		dish.persist();
+    @DELETE
+    @Path("{id}")
+    @Transactional
+    public void deleteRestaurant(@PathParam("id") Long id) {
+        Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
+        optRestaurant.ifPresentOrElse(Restaurant::delete, () -> {
+            throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
+        });
+    }
 
-		return Response.status(Status.CREATED).build();
-	}
+    @GET
+    @Path("{id}/meals")
+    @Tag(name = "Meal")
+    public List<Restaurant> listAllRestaurantMeals(@PathParam("id") Long id) {
+        Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
+        if (optRestaurant.isEmpty()) {
+            throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
+        }
+        return RestaurantMeal.list("restaurant", optRestaurant.get());
+    }
 
-	@PUT
-	@Path("{id}/dishes/{idDish}")
-	@Tag(name = "Dish")
-	@Transactional
-	public void updateRestaurantDish(@PathParam("id") Long id, @PathParam("idDish") Long idDish, DishMenu dishDTO) {
-		Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
-		if (optRestaurant.isEmpty()) {
-			throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
-		}
+    @POST
+    @Path("{id}/meals")
+    @Tag(name = "Meal")
+    @Transactional
+    public Response createRestaurantMeal(@PathParam("id") Long id, RequestCreateRestaurantMealDTO requestDTO) {
+        Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
+        if (optRestaurant.isEmpty()) {
+            throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
+        }
 
-		Optional<DishMenu> optDish = DishMenu.findByIdOptional(idDish);
-		if (optDish.isEmpty()) {
-			throw new NotFoundException("Dish does not exists for id=".concat(idDish.toString()));
-		}
-		
-		DishMenu dish = optDish.get();
-		dish.price = dishDTO.price;
-		dish.persist();
-	}
+        RestaurantMeal meal = restaurantMealMapper.map(id, requestDTO);
 
-	@DELETE
-	@Path("{id}")
-	@Tag(name = "Dish")
-	@Transactional
-	public void deleteRestaurantDish(@PathParam("id") Long id, @PathParam("idDish") Long idDish) {
-		Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
-		if (optRestaurant.isEmpty()) {
-			throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
-		}
-		
-		Optional<DishMenu> optDish = DishMenu.findByIdOptional(id);
-		optDish.ifPresentOrElse(DishMenu::delete, () -> {
-			throw new NotFoundException("Dish does not exists for id=".concat(idDish.toString()));
-		});
-	}
+        meal.persist();
+
+        return Response.status(Status.CREATED).build();
+    }
+
+    @PUT
+    @Path("{id}/meals/{idMeal}")
+    @Tag(name = "Meal")
+    @Transactional
+    public void updateRestaurantMeal(@PathParam("id") Long id, @PathParam("idMeal") Long idMeal,
+            RequestCreateRestaurantMealDTO restaurantMealDTO) {
+        Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
+        if (optRestaurant.isEmpty()) {
+            throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
+        }
+
+        Optional<RestaurantMeal> optMeal = RestaurantMeal.findByIdOptional(idMeal);
+        if (optMeal.isEmpty()) {
+            throw new NotFoundException("Meal does not exists for id=".concat(idMeal.toString()));
+        }
+
+        RestaurantMeal meal = optMeal.get();
+        meal.price = restaurantMealDTO.price;
+        meal.persist();
+    }
+
+    @DELETE
+    @Path("{id}/meals/{idMeal}")
+    @Tag(name = "Meal")
+    @Transactional
+    public void deleteRestaurantMeal(@PathParam("id") Long id, @PathParam("idMeal") Long idMeal) {
+        Optional<Restaurant> optRestaurant = Restaurant.findByIdOptional(id);
+        if (optRestaurant.isEmpty()) {
+            throw new NotFoundException("Restaurant does not exists for id=".concat(id.toString()));
+        }
+
+        Optional<RestaurantMeal> optMeal = RestaurantMeal.findByIdOptional(id);
+        optMeal.ifPresentOrElse(RestaurantMeal::delete, () -> {
+            throw new NotFoundException("Meal does not exists for id=".concat(idMeal.toString()));
+        });
+    }
 }

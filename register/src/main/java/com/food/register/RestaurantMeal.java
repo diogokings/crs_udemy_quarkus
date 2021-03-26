@@ -14,20 +14,20 @@ import javax.persistence.Table;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 
 @Entity
-@Table(name = "DISH_MENU")
-public class DishMenu extends PanacheEntityBase {
+@Table(name = "RESTAURANT_MEAL")
+public class RestaurantMeal extends PanacheEntityBase {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	public Long id;
-	
-	public String name;
-	
-	public String description;
-	
-	@ManyToOne
-	@JoinColumn(name = "RESTAURANT_ID", foreignKey = @ForeignKey(name = "FK_DISHMENU_RESTAURANT"))
-	public Restaurant restaurant;
-	
-	public BigDecimal price;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "RESTAURANT_ID", foreignKey = @ForeignKey(name = "FK_MEAL_RESTAURANT"))
+    public Restaurant restaurant;
+
+    public String name;
+
+    public String description;
+
+    public BigDecimal price;
 }
