@@ -25,10 +25,17 @@ hs_err_pid*
 ### Project ###
 bin/
 target/
-register/
-marketplace/
-order/
 .DS_Store
+
+### Nested Projects ###
+*/target
+*/.classpath
+*/.factorypath
+*/.project
+*/.settings
+*/.mvn
+*/mvnw
+*/mvnw.cmd
 
 ### H2 Database Files ###
 *.mv.db

@@ -1,0 +1,8 @@
+restaurant:
+  - ID: 123
+    NAME: "TEST_1"
+    OWNER: "TEST_1"
+  - ID: 124
+    NAME: "TEST_2"
+    OWNER: "TEST_2"
+    
