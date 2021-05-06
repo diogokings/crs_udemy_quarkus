@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.annotation.security.RolesAllowed;
 import javax.inject.Inject;
 import javax.transaction.Transactional;
 import javax.validation.Valid;
@@ -21,10 +22,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.security.OAuthFlow;
+import org.eclipse.microprofile.openapi.annotations.security.OAuthFlows;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import com.food.register.dto.RequestCreateRestaurantDTO;
@@ -39,6 +44,12 @@ import com.food.register.validation.ConstraintViolationResponse;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Restaurant")
+@RolesAllowed("owner")
+@SecurityScheme(securitySchemeName = "food-auth"
+        , type = SecuritySchemeType.OAUTH2
+        , flows = @OAuthFlows(
+                password = @OAuthFlow(tokenUrl = "http://localhost:8180/auth/realms/food/protocol/openid-connect/token")))
+//@SecurityRequirement(name = "food-auth")
 public class RestaurantResource {
 
     @Inject
@@ -46,7 +57,7 @@ public class RestaurantResource {
 
     @Inject
     RestaurantMealMapper restaurantMealMapper;
-    
+
     @GET
     public List<ResponseRestaurantDTO> listAllRestaurants() {
         Stream<Restaurant> streamRestaurants = Restaurant.streamAll();
